@@ -29,14 +29,20 @@ def generate_heatmap(dates, year):
     df['DayOfWeek'] = df.index.dayofweek
     df['Week'] = df.index.isocalendar().week
 
+    # Mapping integers to three-letter day names
+    days = {0: 'Mon', 1: 'Tue', 2: 'Wed', 3: 'Thu', 4: 'Fri', 5: 'Sat', 6: 'Sun'}
+
+    # Replace day of week integers with three-letter strings
+    df['DayOfWeek'] = df['DayOfWeek'].apply(lambda x: days[x])
+
     # Aggregate data to avoid duplicates in the pivot table
     df_aggregated = df.groupby(['DayOfWeek', 'Week']).sum().reset_index()
 
     # Pivot the aggregated data
     df_pivot = df_aggregated.pivot(index='DayOfWeek', columns='Week', values='Commits')
 
-    # Sort the days of the week starting from Monday
-    df_pivot = df_pivot.reindex(index=[6, 0, 1, 2, 3, 4, 5])
+    # Reorder the days of the week starting from Monday
+    df_pivot = df_pivot.reindex(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'])
 
     # Fill NaN values with 0 since days without commits won't appear in the data
     df_pivot = df_pivot.fillna(0)
@@ -49,6 +55,7 @@ def generate_heatmap(dates, year):
     plt.xlabel('')
     plt.ylabel('')
     plt.show()
+
 
 
 
