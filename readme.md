@@ -4,6 +4,9 @@
 
 This tool empowers developers using Bitbucket, GitLab, or other version control platforms to generate a GitHub-style commit graph. It visualizes a user's commit activity over a year and can be integrated into GitHub as a visually appealing badge, showcasing a developer's dedication and consistency.
 
+![GitHub Style Commit Graph for 2021](images/example.png)
+
+
 ## Features 🔥
 
 - Create a detailed heatmap resembling GitHub's contribution graph
