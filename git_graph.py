@@ -88,7 +88,10 @@ def generate_combined_heatmap(dates, min_year, max_year, person_name=None):
         ax.set_title(f"{year}")
         ax.set_yticks([0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5])
         ax.set_yticklabels(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], rotation=0)
-        ax.set_xticks([])
+
+        ax.set_xticks(range(0, 54, 2))
+        ax.set_xticklabels(range(1, 54, 2))
+        ax.set_xlabel('Week')
 
     if person_name:
         title = f"{person_name}'s Commit Graph from {min_year} to {max_year}"
