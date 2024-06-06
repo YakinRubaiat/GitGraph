@@ -85,11 +85,17 @@ def generate_combined_heatmap(dates, min_year, max_year):
         ax.set_yticks([])
         ax.set_xticks([])
 
-    plt.suptitle(f"GitHub Style Commit Graph from {min_year} to {max_year}", y=1.02)
+    fig.suptitle(f"GitHub Style Commit Graph from {min_year} to {max_year}", y=1.02)
 
     # Create a Tkinter window with a scrollbar
     root = tk.Tk()
     root.title("Scrollable GitHub Commit Graph")
+
+    def on_closing():
+        root.quit()
+        root.destroy()
+
+    root.protocol("WM_DELETE_WINDOW", on_closing)
 
     # Create a canvas
     canvas = tk.Canvas(root, bg="white")
@@ -103,9 +109,14 @@ def generate_combined_heatmap(dates, min_year, max_year):
     canvas.configure(yscrollcommand=scrollbar.set)
     canvas.bind('<Configure>', lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
 
+    def _on_mouse_wheel(event):
+        canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+
+    canvas.bind_all("<MouseWheel>", _on_mouse_wheel)
+
     # Create another frame inside the canvas
     frame = tk.Frame(canvas, bg="white")
-    canvas.create_window((canvas.winfo_width() // 2, 0), window=frame, anchor="n")
+    canvas.create_window((0, 0), window=frame, anchor="nw")
 
     # Add the plot to the frame
     plot_canvas = FigureCanvasTkAgg(fig, frame)
