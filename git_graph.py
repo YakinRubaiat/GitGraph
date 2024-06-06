@@ -5,49 +5,57 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
+import tkinter as tk
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 
-def get_commits(email, year, repo_path):
-    # Change to the specified repository directory
-    original_dir = os.getcwd()  # Save the original directory to return later
+def get_commits(email, year=None, repo_path="."):
+    original_dir = os.getcwd()
     os.chdir(repo_path)
 
-    cmd = f"git log --all --author={email} --since='{year}-01-01' --until='{year}-12-31' --pretty=format:'%ad' --date=short"
+    if year:
+        cmd = f"git log --all --author={email} --since='{year}-01-01' --until='{year}-12-31' --pretty=format:'%ad' --date=short"
+    else:
+        cmd = f"git log --all --author={email} --pretty=format:'%ad' --date=short"
+
     try:
         output = subprocess.check_output(cmd, shell=True).decode()
     finally:
-        os.chdir(original_dir)  # Return to the original directory
+        os.chdir(original_dir)
 
     dates = output.splitlines()
-    # Strip single quotes from each date string before parsing
-    return [datetime.strptime(date.strip("'"), '%Y-%m-%d') for date in dates]
+    dates = [datetime.strptime(date.strip("'"), '%Y-%m-%d') for date in dates]
 
+    if not year:
+        years = [date.year for date in dates]
+        min_year, max_year = min(years), max(years)
+        return dates, min_year, max_year
 
-def generate_heatmap(dates, year):
+    return dates
+
+def prepare_data(dates):
     commit_counts = Counter(dates)
-    dates_range = pd.date_range(start=f'{year}-01-01', end=f'{year}-12-31')
+    min_date = min(dates).replace(month=1, day=1)
+    max_date = max(dates).replace(month=12, day=31)
+    dates_range = pd.date_range(start=min_date, end=max_date)
+
     df = pd.DataFrame(index=dates_range, data={'Commits': [commit_counts.get(date, 0) for date in dates_range]})
     df['DayOfWeek'] = df.index.dayofweek
     df['Week'] = df.index.isocalendar().week
 
-    # Mapping integers to three-letter day names
     days = {0: 'Mon', 1: 'Tue', 2: 'Wed', 3: 'Thu', 4: 'Fri', 5: 'Sat', 6: 'Sun'}
-
-    # Replace day of week integers with three-letter strings
     df['DayOfWeek'] = df['DayOfWeek'].apply(lambda x: days[x])
 
-    # Aggregate data to avoid duplicates in the pivot table
-    df_aggregated = df.groupby(['DayOfWeek', 'Week']).sum().reset_index()
+    return df
 
-    # Pivot the aggregated data
+def generate_heatmap(dates, year):
+    df = prepare_data(dates)
+    df_year = df[df.index.year == year]
+    df_aggregated = df_year.groupby(['DayOfWeek', 'Week']).sum().reset_index()
     df_pivot = df_aggregated.pivot(index='DayOfWeek', columns='Week', values='Commits')
-
-    # Reorder the days of the week starting from Monday
     df_pivot = df_pivot.reindex(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'])
-
-    # Fill NaN values with 0 since days without commits won't appear in the data
     df_pivot = df_pivot.fillna(0)
 
-    plt.figure(figsize=(15, 5))
+    plt.figure(figsize=(8, 4))
     sns.heatmap(df_pivot, cmap="Greens", square=True, cbar_kws={"shrink": 0.5}, linewidths=.5)
     plt.yticks(rotation=0)
     plt.xticks(rotation=90)
@@ -56,12 +64,62 @@ def generate_heatmap(dates, year):
     plt.ylabel('')
     plt.show()
 
+def generate_combined_heatmap(dates, min_year, max_year):
+    df = prepare_data(dates)
+    num_years = max_year - min_year + 1
 
+    fig, axes = plt.subplots(num_years, 1, figsize=(8, num_years * 2), constrained_layout=True)
 
+    if num_years == 1:
+        axes = [axes]
 
+    for ax, year in zip(axes, range(min_year, max_year + 1)):
+        df_year = df[df.index.year == year]
+        df_aggregated = df_year.groupby(['DayOfWeek', 'Week']).sum().reset_index()
+        df_pivot = df_aggregated.pivot(index='DayOfWeek', columns='Week', values='Commits')
+        df_pivot = df_pivot.reindex(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'])
+        df_pivot = df_pivot.fillna(0)
+
+        sns.heatmap(df_pivot, cmap="Greens", square=True, cbar_kws={"shrink": 0.5}, linewidths=.5, ax=ax)
+        ax.set_title(f"{year}")
+        ax.set_yticks([])
+        ax.set_xticks([])
+
+    plt.suptitle(f"GitHub Style Commit Graph from {min_year} to {max_year}", y=1.02)
+
+    # Create a Tkinter window with a scrollbar
+    root = tk.Tk()
+    root.title("Scrollable GitHub Commit Graph")
+
+    # Create a canvas
+    canvas = tk.Canvas(root, bg="white")
+    canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=1)
+
+    # Add a scrollbar
+    scrollbar = tk.Scrollbar(root, orient=tk.VERTICAL, command=canvas.yview)
+    scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+    # Configure the canvas
+    canvas.configure(yscrollcommand=scrollbar.set)
+    canvas.bind('<Configure>', lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+
+    # Create another frame inside the canvas
+    frame = tk.Frame(canvas, bg="white")
+    canvas.create_window((canvas.winfo_width() // 2, 0), window=frame, anchor="n")
+
+    # Add the plot to the frame
+    plot_canvas = FigureCanvasTkAgg(fig, frame)
+    plot_canvas.draw()
+    plot_canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
+
+    # Add a toolbar
+    toolbar = NavigationToolbar2Tk(plot_canvas, frame)
+    toolbar.update()
+    plot_canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
+
+    root.mainloop()
 
 def print_ascii_art():
-    # ASCII Art with ANSI escape codes for colors
     print("\033[91m" + "   ____ _ _  " + "\033[0m")
     print("\033[92m" + "  / ___(_) |_ " + "\033[0m")
     print("\033[93m" + " | |  _| | __|" + "\033[0m")
@@ -69,21 +127,21 @@ def print_ascii_art():
     print("\033[95m" + "  \____|_|\__|" + "\033[0m")
 
 def main():
-    # Print ASCII Art
     print_ascii_art()
-
-    # ASCII Art Title
     print("GITHUB GRAPH\n")
 
-    # Interactive Inputs
     email = input("Enter the email: ")
-    year = input("Enter the year: ")
-    repo_path = input("Enter the path of the repository: ")  # New input for repository path
+    year = input("Enter the year (or leave blank to use all years): ")
+    repo_path = input("Enter the path of the repository: ")
 
     try:
-        year = int(year)  # Converting year to integer
-        dates = get_commits(email, year, repo_path)  # Pass the repo_path to get_commits
-        generate_heatmap(dates, year)
+        if year:
+            year = int(year)
+            dates = get_commits(email, year, repo_path)
+            generate_heatmap(dates, year)
+        else:
+            dates, min_year, max_year = get_commits(email, repo_path=repo_path)
+            generate_combined_heatmap(dates, min_year, max_year)
     except Exception as e:
         print(f"Error: {e}")
 
