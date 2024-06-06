@@ -61,7 +61,12 @@ def generate_heatmap(dates, year, person_name=None):
     sns.heatmap(df_pivot, cmap="Greens", square=True, linewidths=.5, cbar_kws={"shrink": 0.5})
     plt.yticks(rotation=0)
     plt.xticks(rotation=90)
-    title = f"GitHub Style Commit Graph for {year}" + (f" ({person_name})" if person_name else "")
+
+    if person_name:
+        title = f"{person_name}'s Commit Graph for {year}"
+    else:
+        title = f"Commit Graph for {year}"
+        
     plt.title(title)
     plt.xlabel('Week')
     plt.ylabel('')
@@ -70,7 +75,7 @@ def generate_heatmap(dates, year, person_name=None):
 def generate_combined_heatmap(dates, min_year, max_year, person_name=None):
     df = prepare_data(dates)
     num_years = max_year - min_year + 1
-    fig, axes = plt.subplots(num_years, 1, figsize=(8, num_years * 2), gridspec_kw={'hspace': 0.05})
+    fig, axes = plt.subplots(num_years, 1, figsize=(8, num_years * 2), constrained_layout=True)
     if num_years == 1:
         axes = [axes]
 
@@ -85,10 +90,12 @@ def generate_combined_heatmap(dates, min_year, max_year, person_name=None):
         ax.set_yticklabels(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], rotation=0)
         ax.set_xticks([])
 
-    title = f"GitHub Style Commit Graph from {min_year} to {max_year}"
     if person_name:
-        title += f" ({person_name})"
-    fig.suptitle(title, y=1.02)
+        title = f"{person_name}'s Commit Graph from {min_year} to {max_year}"
+    else:
+        title = f"Commit Graph from {min_year} to {max_year}"
+
+    fig.suptitle(title, fontsize=16)
 
     display_tkinter(fig)
 
